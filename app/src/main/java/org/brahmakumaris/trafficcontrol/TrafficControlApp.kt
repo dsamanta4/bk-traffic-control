@@ -22,6 +22,14 @@ class TrafficControlApp : Application() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = getSystemService(NotificationManager::class.java)
 
+        // A channel's importance is fixed forever once createNotificationChannel()
+        // first runs on a device - calling it again with a different importance is
+        // silently ignored by Android, it does NOT update the existing channel. Any
+        // phone that had an earlier build installed (every phone in this project's
+        // testing, for one) would be permanently stuck on the old importance unless
+        // the channel ID itself changes. That's why this is "_v2", not "tc_playback".
+        manager.deleteNotificationChannel("tc_playback")
+
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_SERVICE,
@@ -45,6 +53,6 @@ class TrafficControlApp : Application() {
 
     companion object {
         const val CHANNEL_SERVICE = "tc_service"
-        const val CHANNEL_PLAYBACK = "tc_playback"
+        const val CHANNEL_PLAYBACK = "tc_playback_v2"
     }
 }
