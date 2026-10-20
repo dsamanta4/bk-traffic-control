@@ -45,6 +45,7 @@ class AlarmReceiver : BroadcastReceiver() {
         val serviceIntent = Intent(context, PlaybackService::class.java)
             .putExtra(PlaybackService.EXTRA_SLOT_ID, slotId)
             .putExtra(PlaybackService.EXTRA_LABEL, label)
+            .putExtra(PlaybackService.EXTRA_IS_REAL_ALARM, true)
         ContextCompat.startForegroundService(context, serviceIntent)
     }
 }

@@ -1,6 +1,9 @@
 package org.brahmakumaris.trafficcontrol.ui
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.widget.ImageButton
@@ -23,6 +26,31 @@ class MainActivity : AppCompatActivity() {
     private lateinit var prefs: SchedulePrefs
     private lateinit var scheduler: AlarmScheduler
 
+    private val slotPlayButtons = mutableMapOf<Int, ImageButton>()
+    private var previewingSlotId: Int? = null
+
+    private val playbackStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val slotId = intent.getIntExtra(PlaybackService.EXTRA_SLOT_ID, Int.MIN_VALUE)
+            val playing = intent.getBooleanExtra(PlaybackService.EXTRA_PLAYING, false)
+            if (playing) {
+                // A new slot started: whichever button was showing "stop" before is now stale.
+                previewingSlotId?.let { setButtonPlaying(it, false) }
+                previewingSlotId = slotId
+                setButtonPlaying(slotId, true)
+            } else if (slotId == previewingSlotId) {
+                previewingSlotId = null
+                setButtonPlaying(slotId, false)
+            }
+        }
+    }
+
+    private fun setButtonPlaying(slotId: Int, playing: Boolean) {
+        slotPlayButtons[slotId]?.setImageResource(
+            if (playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play
+        )
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -44,6 +72,21 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         updateReliabilityStatus()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val filter = IntentFilter(PlaybackService.ACTION_PLAYBACK_STATE)
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(playbackStateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(playbackStateReceiver, filter)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        unregisterReceiver(playbackStateReceiver)
     }
 
     private fun updateReliabilityStatus() {
@@ -82,8 +125,14 @@ class MainActivity : AppCompatActivity() {
                 scheduler.rescheduleSlot(slot.id)
             }
 
-            row.findViewById<ImageButton>(R.id.slotPlay).setOnClickListener {
-                previewSlot(slot.id, slot.label)
+            val playButton = row.findViewById<ImageButton>(R.id.slotPlay)
+            slotPlayButtons[slot.id] = playButton
+            playButton.setOnClickListener {
+                if (previewingSlotId == slot.id) {
+                    stopPreview()
+                } else {
+                    previewSlot(slot.id, slot.label)
+                }
             }
 
             binding.slotsContainer.addView(row)
@@ -91,11 +140,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Manual preview, independent of the slot's enabled/scheduled state - lets you check
-     * volume or hear a track without waiting for its real alarm time. */
+     * volume or hear a track without waiting for its real alarm time. Starting a new preview
+     * automatically replaces whatever was previously playing (see PlaybackService.playTrack). */
     private fun previewSlot(slotId: Int, label: String) {
         val intent = Intent(this, PlaybackService::class.java)
             .putExtra(PlaybackService.EXTRA_SLOT_ID, slotId)
             .putExtra(PlaybackService.EXTRA_LABEL, label)
         ContextCompat.startForegroundService(this, intent)
+    }
+
+    private fun stopPreview() {
+        startService(Intent(this, PlaybackService::class.java).setAction(PlaybackService.ACTION_STOP))
     }
 }

@@ -65,7 +65,27 @@
             android:layout_marginBottom="24dp"
             android:text="@string/step_battery_action" />
 
-        <!-- Step 3: OEM autostart -->
+        <!-- Step 3: Exact alarm permission -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/step_exact_alarm_title"
+            android:textStyle="bold"
+            android:textSize="16sp" />
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="8dp"
+            android:text="@string/step_exact_alarm_desc" />
+        <Button
+            android:id="@+id/btnExactAlarm"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            android:text="@string/step_exact_alarm_action" />
+
+        <!-- Step 4: OEM autostart -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

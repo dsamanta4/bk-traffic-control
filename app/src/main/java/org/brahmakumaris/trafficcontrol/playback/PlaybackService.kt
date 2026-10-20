@@ -25,12 +25,22 @@ class PlaybackService : Service() {
 
     private var mediaPlayer: MediaPlayer? = null
     private var wakeLock: PowerManager.WakeLock? = null
+    private var currentSlotId: Int? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP) {
+            stopSelfSafely()
+            return START_NOT_STICKY
+        }
+
         val slotId = intent?.getIntExtra(EXTRA_SLOT_ID, Int.MIN_VALUE) ?: Int.MIN_VALUE
         val label = intent?.getStringExtra(EXTRA_LABEL) ?: getString(R.string.notif_test_text)
+        val isRealAlarm = intent?.getBooleanExtra(EXTRA_IS_REAL_ALARM, false) ?: false
+        currentSlotId = slotId
+
+        if (isRealAlarm) raiseSystemAlarmVolume()
 
         startForeground(NOTIFICATION_ID, buildNotification(label))
 
@@ -73,6 +83,7 @@ class PlaybackService : Service() {
                 prepare()
                 start()
             }
+            broadcastState(playing = true)
         } catch (e: Exception) {
             Log.e(TAG, "Playback failed", e)
             stopSelfSafely()
@@ -86,8 +97,41 @@ class PlaybackService : Service() {
         }
         mediaPlayer = null
         if (wakeLock?.isHeld == true) wakeLock?.release()
+        broadcastState(playing = false)
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    /**
+     * Real alarms only - never for manual preview. The app's own volume slider
+     * (see playTrack) only ever scales DOWN from whatever the phone's system
+     * alarm channel happens to be set to; it can never make a quiet device
+     * loud. Devices drift quiet on their own (physical volume buttons, a
+     * battery saver mode, or just different OEM defaults - this is literally
+     * why a Xiaomi and a Motorola sounded different in testing even with the
+     * in-app slider identically at 100%). So for a real scheduled alarm, make
+     * sure the one thing that actually controls ceiling loudness - the
+     * device's own alarm stream - is all the way up before playing.
+     */
+    private fun raiseSystemAlarmVolume() {
+        try {
+            val am = getSystemService(AUDIO_SERVICE) as AudioManager
+            val max = am.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+            am.setStreamVolume(AudioManager.STREAM_ALARM, max, 0)
+        } catch (e: Exception) {
+            Log.e(TAG, "Could not raise system alarm volume", e)
+        }
+    }
+
+    /** Lets MainActivity's preview buttons reflect what's actually playing. */
+    private fun broadcastState(playing: Boolean) {
+        val slotId = currentSlotId ?: return
+        sendBroadcast(
+            Intent(ACTION_PLAYBACK_STATE)
+                .setPackage(packageName)
+                .putExtra(EXTRA_SLOT_ID, slotId)
+                .putExtra(EXTRA_PLAYING, playing)
+        )
     }
 
     private fun buildNotification(label: String) =
@@ -113,5 +157,9 @@ class PlaybackService : Service() {
         private const val NOTIFICATION_ID = 42
         const val EXTRA_SLOT_ID = "extra_slot_id"
         const val EXTRA_LABEL = "extra_label"
+        const val EXTRA_PLAYING = "extra_playing"
+        const val EXTRA_IS_REAL_ALARM = "extra_is_real_alarm"
+        const val ACTION_STOP = "org.brahmakumaris.trafficcontrol.ACTION_STOP"
+        const val ACTION_PLAYBACK_STATE = "org.brahmakumaris.trafficcontrol.ACTION_PLAYBACK_STATE"
     }
 }

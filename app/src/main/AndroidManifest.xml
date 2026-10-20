@@ -10,12 +10,19 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!--
-      No SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM here on purpose: every alarm
-      in this app is scheduled with AlarmManager.setAlarmClock(), which is
-      the one exact-alarm API that has never required either permission, at
-      any API level - see AlarmScheduler.kt for why that matters for a
-      sideloaded app.
+      Stock Android never requires SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM for
+      setAlarmClock() - but real-device testing on a Xiaomi/MIUI phone showed
+      MIUI enforces it anyway (a MIUI-specific deviation from AOSP), throwing
+      SecurityException from every setAlarmClock() call and silently leaving
+      every alarm unscheduled. USE_EXACT_ALARM is declared here because this
+      app's whole purpose is scheduled alarms, which is exactly the case
+      Android auto-grants it for (no user prompt, even when sideloaded).
+      SCHEDULE_EXACT_ALARM plus the Setup-screen runtime check is the
+      fallback for any device/OS combination where that auto-grant doesn't
+      apply.
     -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
 
     <application

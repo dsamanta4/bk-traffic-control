@@ -23,11 +23,16 @@
     <string name="step_battery_action">Open battery settings</string>
     <string name="step_battery_done">Already exempted</string>
 
-    <string name="step_autostart_title">3. Allow auto-start / background activity</string>
+    <string name="step_exact_alarm_title">3. Allow exact alarms</string>
+    <string name="step_exact_alarm_desc">Some phone brands (Xiaomi/MIUI in particular) block precise alarm timing unless this is granted separately, even though stock Android doesn\'t require it. Without this, alarms can be delayed or skipped entirely.</string>
+    <string name="step_exact_alarm_action">Allow exact alarms</string>
+    <string name="step_exact_alarm_done">Allowed</string>
+
+    <string name="step_autostart_title">4. Allow auto-start / background activity</string>
     <string name="step_autostart_desc">Most phone brands (Xiaomi, Samsung, Vivo, Oppo, Motorola, OnePlus…) have an EXTRA battery manager of their own, on top of Android\'s. Open it and allow Traffic Control to auto-start and run in the background.</string>
     <string name="step_autostart_action">Open %1$s settings</string>
 
-    <string name="step_test_title">4. Test it right now</string>
+    <string name="step_test_title">5. Test it right now</string>
     <string name="step_test_desc">Fires a test alarm one minute from now, using the real alarm path end-to-end, so you know immediately if setup worked — no need to wait until 3:30 AM.</string>
     <string name="step_test_action">Send test alarm in 1 minute</string>
     <string name="step_test_scheduled">Test alarm scheduled for %1$s</string>

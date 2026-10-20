@@ -2,6 +2,7 @@ package org.brahmakumaris.trafficcontrol.ui
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -24,6 +25,7 @@ class SetupActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySetupBinding
     private lateinit var prefs: SchedulePrefs
+    private var wasExactAlarmAllowed = false
 
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -35,9 +37,11 @@ class SetupActivity : AppCompatActivity() {
         binding = ActivitySetupBinding.inflate(layoutInflater)
         setContentView(binding.root)
         prefs = SchedulePrefs(this)
+        wasExactAlarmAllowed = canScheduleExactAlarms()
 
         binding.btnNotifications.setOnClickListener { requestNotificationPermission() }
         binding.btnBattery.setOnClickListener { requestIgnoreBatteryOptimizations() }
+        binding.btnExactAlarm.setOnClickListener { requestExactAlarmPermission() }
         binding.btnAutostart.text =
             getString(R.string.step_autostart_action, OemSettings.manufacturerLabel())
         binding.btnAutostart.setOnClickListener { OemSettings.openManufacturerSettings(this) }
@@ -51,6 +55,15 @@ class SetupActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         refreshStepStates()
+
+        // The exact-alarm permission can only be granted by leaving this screen (to the
+        // Settings page) and coming back, so newly-granted here means every alarm that
+        // failed to schedule earlier (e.g. at first app launch) needs to be re-armed now.
+        val nowAllowed = canScheduleExactAlarms()
+        if (nowAllowed && !wasExactAlarmAllowed) {
+            AlarmScheduler(this).rescheduleAll()
+        }
+        wasExactAlarmAllowed = nowAllowed
     }
 
     private fun refreshStepStates() {
@@ -61,6 +74,30 @@ class SetupActivity : AppCompatActivity() {
         binding.btnBattery.isEnabled = !ignoringBatteryOptimizations()
         binding.btnBattery.text = if (ignoringBatteryOptimizations())
             getString(R.string.step_battery_done) else getString(R.string.step_battery_action)
+
+        binding.btnExactAlarm.isEnabled = !canScheduleExactAlarms()
+        binding.btnExactAlarm.text = if (canScheduleExactAlarms())
+            getString(R.string.step_exact_alarm_done) else getString(R.string.step_exact_alarm_action)
+    }
+
+    private fun canScheduleExactAlarms(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
+        val am = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        return am.canScheduleExactAlarms()
+    }
+
+    private fun requestExactAlarmPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+            data = Uri.parse("package:$packageName")
+        }
+        try {
+            startActivity(intent)
+        } catch (e: Exception) {
+            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:$packageName")
+            })
+        }
     }
 
     private fun notificationsGranted(): Boolean {
