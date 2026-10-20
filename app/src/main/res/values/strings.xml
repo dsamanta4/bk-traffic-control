@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Traffic Control</string>
+
+    <string name="home_title">Traffic Control</string>
+    <string name="home_subtitle">9 daily reminders</string>
+    <string name="reliability_setup">Reliability setup</string>
+    <string name="reliability_not_done">Not done yet — tap to fix missed alarms</string>
+    <string name="reliability_done">Setup complete</string>
+    <string name="volume_label">Volume</string>
+
+    <string name="setup_title">Reliability setup</string>
+    <string name="setup_intro">Your phone\'s manufacturer (Samsung, Xiaomi/MI, Motorola, etc.) tries to save battery by closing apps running in the background. This can stop Traffic Control from playing at the right time. Complete every step below once, on this phone, so alarms never get missed.</string>
+
+    <string name="step_notifications_title">1. Allow notifications</string>
+    <string name="step_notifications_desc">Needed to show that Traffic Control is running and to play sound reliably.</string>
+    <string name="step_notifications_action">Allow notifications</string>
+    <string name="step_notifications_done">Allowed</string>
+
+    <string name="step_battery_title">2. Ignore battery optimisation</string>
+    <string name="step_battery_desc">Stops stock Android from pausing this app to save battery.</string>
+    <string name="step_battery_action">Open battery settings</string>
+    <string name="step_battery_done">Already exempted</string>
+
+    <string name="step_autostart_title">3. Allow auto-start / background activity</string>
+    <string name="step_autostart_desc">Most phone brands (Xiaomi, Samsung, Vivo, Oppo, Motorola, OnePlus…) have an EXTRA battery manager of their own, on top of Android\'s. Open it and allow Traffic Control to auto-start and run in the background.</string>
+    <string name="step_autostart_action">Open %1$s settings</string>
+
+    <string name="step_test_title">4. Test it right now</string>
+    <string name="step_test_desc">Fires a test alarm one minute from now, using the real alarm path end-to-end, so you know immediately if setup worked — no need to wait until 3:30 AM.</string>
+    <string name="step_test_action">Send test alarm in 1 minute</string>
+    <string name="step_test_scheduled">Test alarm scheduled for %1$s</string>
+
+    <string name="setup_done_button">Done</string>
+
+    <string name="notif_channel_service_name">Traffic Control status</string>
+    <string name="notif_channel_playback_name">Scheduled reminder playing</string>
+    <string name="notif_playing_title">Traffic Control</string>
+    <string name="notif_playing_text">Playing: %1$s</string>
+    <string name="notif_test_text">Test reminder</string>
+</resources>
