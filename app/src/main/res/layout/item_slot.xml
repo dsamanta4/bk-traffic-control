@@ -7,6 +7,15 @@
     android:gravity="center_vertical"
     android:paddingVertical="12dp">
 
+    <ImageButton
+        android:id="@+id/slotPlay"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginEnd="8dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/preview_play_desc"
+        android:src="@android:drawable/ic_media_play" />
+
     <TextView
         android:id="@+id/slotTime"
         android:layout_width="80dp"

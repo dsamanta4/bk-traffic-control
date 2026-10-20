@@ -8,6 +8,7 @@
     <string name="reliability_not_done">Not done yet — tap to fix missed alarms</string>
     <string name="reliability_done">Setup complete</string>
     <string name="volume_label">Volume</string>
+    <string name="preview_play_desc">Preview this track</string>
 
     <string name="setup_title">Reliability setup</string>
     <string name="setup_intro">Your phone\'s manufacturer (Samsung, Xiaomi/MI, Motorola, etc.) tries to save battery by closing apps running in the background. This can stop Traffic Control from playing at the right time. Complete every step below once, on this phone, so alarms never get missed.</string>

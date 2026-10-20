@@ -3,9 +3,11 @@ package org.brahmakumaris.trafficcontrol.ui
 import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.widget.ImageButton
 import android.widget.SeekBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.google.android.material.switchmaterial.SwitchMaterial
 import org.brahmakumaris.trafficcontrol.R
 import org.brahmakumaris.trafficcontrol.alarm.AlarmRefreshWorker
@@ -13,6 +15,7 @@ import org.brahmakumaris.trafficcontrol.alarm.AlarmScheduler
 import org.brahmakumaris.trafficcontrol.data.Schedule
 import org.brahmakumaris.trafficcontrol.data.SchedulePrefs
 import org.brahmakumaris.trafficcontrol.databinding.ActivityMainBinding
+import org.brahmakumaris.trafficcontrol.playback.PlaybackService
 
 class MainActivity : AppCompatActivity() {
 
@@ -79,7 +82,20 @@ class MainActivity : AppCompatActivity() {
                 scheduler.rescheduleSlot(slot.id)
             }
 
+            row.findViewById<ImageButton>(R.id.slotPlay).setOnClickListener {
+                previewSlot(slot.id, slot.label)
+            }
+
             binding.slotsContainer.addView(row)
         }
+    }
+
+    /** Manual preview, independent of the slot's enabled/scheduled state - lets you check
+     * volume or hear a track without waiting for its real alarm time. */
+    private fun previewSlot(slotId: Int, label: String) {
+        val intent = Intent(this, PlaybackService::class.java)
+            .putExtra(PlaybackService.EXTRA_SLOT_ID, slotId)
+            .putExtra(PlaybackService.EXTRA_LABEL, label)
+        ContextCompat.startForegroundService(this, intent)
     }
 }
