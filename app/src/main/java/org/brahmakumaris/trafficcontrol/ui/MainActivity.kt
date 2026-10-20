@@ -4,11 +4,14 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.widget.ImageButton
 import android.widget.SeekBar
 import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.google.android.material.switchmaterial.SwitchMaterial
@@ -17,8 +20,10 @@ import org.brahmakumaris.trafficcontrol.alarm.AlarmRefreshWorker
 import org.brahmakumaris.trafficcontrol.alarm.AlarmScheduler
 import org.brahmakumaris.trafficcontrol.data.Schedule
 import org.brahmakumaris.trafficcontrol.data.SchedulePrefs
+import org.brahmakumaris.trafficcontrol.data.SettingsTransfer
 import org.brahmakumaris.trafficcontrol.databinding.ActivityMainBinding
 import org.brahmakumaris.trafficcontrol.playback.PlaybackService
+import org.brahmakumaris.trafficcontrol.update.UpdateChecker
 
 class MainActivity : AppCompatActivity() {
 
@@ -28,6 +33,21 @@ class MainActivity : AppCompatActivity() {
 
     private val slotPlayButtons = mutableMapOf<Int, ImageButton>()
     private var previewingSlotId: Int? = null
+
+    private val importLauncher =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+            if (uri == null) return@registerForActivityResult
+            val ok = SettingsTransfer.importFrom(this, uri)
+            Toast.makeText(
+                this,
+                if (ok) R.string.import_success else R.string.import_failure,
+                Toast.LENGTH_SHORT
+            ).show()
+            if (ok) {
+                setUpVolumeSlider()
+                setUpSlots()
+            }
+        }
 
     private val playbackStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -67,11 +87,29 @@ class MainActivity : AppCompatActivity() {
         binding.reliabilityCard.setOnClickListener {
             startActivity(Intent(this, SetupActivity::class.java))
         }
+
+        binding.viewLogLink.setOnClickListener {
+            startActivity(Intent(this, LogActivity::class.java))
+        }
+
+        binding.exportLink.setOnClickListener { exportSettings() }
+        binding.importLink.setOnClickListener { importLauncher.launch("*/*") }
+    }
+
+    private fun exportSettings() {
+        val uri = SettingsTransfer.exportToShareableFile(this)
+        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/json"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(Intent.createChooser(sendIntent, getString(R.string.export_settings_action)))
     }
 
     override fun onResume() {
         super.onResume()
         updateReliabilityStatus()
+        UpdateChecker.checkOncePerDay(this)
     }
 
     override fun onStart() {

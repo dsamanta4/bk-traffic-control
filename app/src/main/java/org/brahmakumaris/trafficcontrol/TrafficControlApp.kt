@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
 import org.brahmakumaris.trafficcontrol.alarm.AlarmScheduler
+import org.brahmakumaris.trafficcontrol.data.AlarmLog
 
 class TrafficControlApp : Application() {
 
@@ -14,6 +15,7 @@ class TrafficControlApp : Application() {
         // Make sure every enabled slot has a pending alarm as soon as the
         // process is alive for any reason (launcher, boot, or OS-triggered).
         AlarmScheduler(this).rescheduleAll()
+        AlarmLog(this).detectAndLogMissed()
     }
 
     private fun createNotificationChannels() {
@@ -29,10 +31,14 @@ class TrafficControlApp : Application() {
         )
 
         manager.createNotificationChannel(
+            // HIGH so it pops up (heads-up) and is unmissable on the lock
+            // screen the moment the user wakes the phone, not just sitting
+            // quietly in the shade - that's what makes "wake screen, tap
+            // Stop" actually work in practice.
             NotificationChannel(
                 CHANNEL_PLAYBACK,
                 getString(R.string.notif_channel_playback_name),
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_HIGH
             )
         )
     }

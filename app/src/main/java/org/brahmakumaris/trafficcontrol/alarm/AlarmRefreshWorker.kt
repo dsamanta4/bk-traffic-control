@@ -6,6 +6,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import org.brahmakumaris.trafficcontrol.data.AlarmLog
 import org.brahmakumaris.trafficcontrol.data.Schedule
 import org.brahmakumaris.trafficcontrol.data.SchedulePrefs
 import java.util.concurrent.TimeUnit
@@ -33,6 +34,10 @@ class AlarmRefreshWorker(context: Context, params: WorkerParameters) : Coroutine
                 scheduler.scheduleNextOccurrence(slot.id, slot.hour, slot.minute)
             }
         }
+
+        AlarmLog(applicationContext).detectAndLogMissed()
+        HealthCheck.runAndNotify(applicationContext)
+
         return Result.success()
     }
 

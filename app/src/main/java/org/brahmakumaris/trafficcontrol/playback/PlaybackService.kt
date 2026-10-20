@@ -1,5 +1,6 @@
 package org.brahmakumaris.trafficcontrol.playback
 
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.media.AudioAttributes
@@ -12,6 +13,8 @@ import androidx.core.app.NotificationCompat
 import org.brahmakumaris.trafficcontrol.R
 import org.brahmakumaris.trafficcontrol.TrafficControlApp
 import org.brahmakumaris.trafficcontrol.alarm.AlarmScheduler
+import org.brahmakumaris.trafficcontrol.data.AlarmLog
+import org.brahmakumaris.trafficcontrol.data.AlarmOutcome
 import org.brahmakumaris.trafficcontrol.data.Schedule
 import org.brahmakumaris.trafficcontrol.data.SchedulePrefs
 
@@ -26,6 +29,8 @@ class PlaybackService : Service() {
     private var mediaPlayer: MediaPlayer? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var currentSlotId: Int? = null
+    private var currentLabel: String = ""
+    private var currentIsRealAlarm: Boolean = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -39,6 +44,8 @@ class PlaybackService : Service() {
         val label = intent?.getStringExtra(EXTRA_LABEL) ?: getString(R.string.notif_test_text)
         val isRealAlarm = intent?.getBooleanExtra(EXTRA_IS_REAL_ALARM, false) ?: false
         currentSlotId = slotId
+        currentLabel = label
+        currentIsRealAlarm = isRealAlarm
 
         if (isRealAlarm) raiseSystemAlarmVolume()
 
@@ -55,6 +62,7 @@ class PlaybackService : Service() {
         }
 
         if (resId == null) {
+            if (isRealAlarm) AlarmLog(this).record(slotId, label, AlarmOutcome.ERROR)
             stopSelfSafely()
             return START_NOT_STICKY
         }
@@ -84,8 +92,14 @@ class PlaybackService : Service() {
                 start()
             }
             broadcastState(playing = true)
+            if (currentIsRealAlarm) {
+                AlarmLog(this).record(currentSlotId ?: return, currentLabel, AlarmOutcome.FIRED)
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Playback failed", e)
+            if (currentIsRealAlarm) {
+                AlarmLog(this).record(currentSlotId ?: AlarmScheduler.TEST_SLOT_ID, currentLabel, AlarmOutcome.ERROR)
+            }
             stopSelfSafely()
         }
     }
@@ -134,14 +148,32 @@ class PlaybackService : Service() {
         )
     }
 
-    private fun buildNotification(label: String) =
-        NotificationCompat.Builder(this, TrafficControlApp.CHANNEL_PLAYBACK)
+    /**
+     * VISIBILITY_PUBLIC + CATEGORY_ALARM is what makes the Stop action show
+     * up and be tappable straight from the lock screen on a simple screen
+     * wake - no unlock needed - which is the behaviour asked for: someone in
+     * a meeting or out shopping can silence a real alarm without even
+     * opening the phone, by waking the screen and tapping Stop. Firing
+     * stopPendingIntent only ever sends ACTION_STOP to this already-running
+     * service, so it works without needing the device unlocked.
+     */
+    private fun buildNotification(label: String): android.app.Notification {
+        val stopIntent = Intent(this, PlaybackService::class.java).setAction(ACTION_STOP)
+        val stopPendingIntent = PendingIntent.getService(
+            this, 0, stopIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        return NotificationCompat.Builder(this, TrafficControlApp.CHANNEL_PLAYBACK)
             .setContentTitle(getString(R.string.notif_playing_title))
             .setContentText(getString(R.string.notif_playing_text, label))
             .setSmallIcon(android.R.drawable.ic_lock_silent_mode_off)
             .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .addAction(android.R.drawable.ic_media_pause, getString(R.string.notif_stop_action), stopPendingIntent)
             .build()
+    }
 
     override fun onDestroy() {
         super.onDestroy()

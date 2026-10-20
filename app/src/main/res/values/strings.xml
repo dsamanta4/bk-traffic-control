@@ -8,6 +8,21 @@
     <string name="reliability_not_done">Not done yet — tap to fix missed alarms</string>
     <string name="reliability_done">Setup complete</string>
     <string name="volume_label">Volume</string>
+    <string name="view_log_action">View alarm history</string>
+    <string name="export_settings_action">Export settings</string>
+    <string name="import_settings_action">Import settings</string>
+    <string name="import_success">Settings imported</string>
+    <string name="import_failure">Couldn\'t read that file</string>
+
+    <string name="update_available_title">Traffic Control update available</string>
+    <string name="update_available_text">Version %1$s is out — tap to download</string>
+
+    <string name="log_title">Alarm history</string>
+    <string name="log_subtitle">What actually fired, and what didn\'t.</string>
+    <string name="log_empty">Nothing logged yet.</string>
+    <string name="log_outcome_fired">FIRED</string>
+    <string name="log_outcome_missed">MISSED</string>
+    <string name="log_outcome_error">ERROR</string>
     <string name="preview_play_desc">Preview this track</string>
 
     <string name="setup_title">Reliability setup</string>
@@ -39,9 +54,14 @@
 
     <string name="setup_done_button">Done</string>
 
+    <string name="health_check_title">Traffic Control needs a quick fix</string>
+    <string name="health_check_battery">Battery saving got turned back on for this app — tap to fix</string>
+    <string name="health_check_exact_alarm">Exact alarm permission was turned off — tap to fix</string>
+
     <string name="notif_channel_service_name">Traffic Control status</string>
     <string name="notif_channel_playback_name">Scheduled reminder playing</string>
     <string name="notif_playing_title">Traffic Control</string>
     <string name="notif_playing_text">Playing: %1$s</string>
+    <string name="notif_stop_action">Stop</string>
     <string name="notif_test_text">Test reminder</string>
 </resources>
