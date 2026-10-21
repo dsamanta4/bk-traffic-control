@@ -6,33 +6,44 @@
     android:layout_height="match_parent"
     android:background="#1A1A2E">
 
+    <!--
+      fitCenter, not centerCrop: two of the four bundled images carry a
+      full-width Hindi caption or watermark right to their edges, and half
+      the bundle is 16:9 landscape being shown on a tall portrait screen -
+      centerCrop would slice most of that text away. fitCenter always shows
+      the whole image, letterboxed on the dark background below.
+    -->
     <ImageView
         android:id="@+id/ringingBackground"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="centerCrop"
+        android:scaleType="fitCenter"
         android:contentDescription="@null"
         tools:src="@drawable/ringing_bg_1" />
 
-    <!-- Darkens the photo so white text/buttons stay readable over any image. -->
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#99000000" />
-
+    <!--
+      No scrim and no overlay text on the image itself - fitCenter always
+      leaves a dark letterbox bar above and below the picture (it never
+      fills the whole screen except by coincidence of aspect ratio), and
+      everything below is confined to those bars so the image is shown
+      clean, undimmed, and fully readable including the text baked into two
+      of the four bundled pictures.
+    -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
         android:orientation="vertical"
-        android:gravity="center"
-        android:padding="32dp">
+        android:gravity="center_horizontal"
+        android:paddingHorizontal="32dp"
+        android:paddingTop="32dp">
 
         <TextView
             android:id="@+id/ringingTime"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="#FFFFFF"
-            android:textSize="56sp"
+            android:textSize="48sp"
             android:textStyle="bold"
             tools:text="03:30" />
 
@@ -42,13 +53,24 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:textColor="#EEEEEE"
-            android:textSize="20sp"
+            android:textSize="18sp"
             tools:text="Amrit Vela Hudh" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        android:gravity="center_horizontal"
+        android:paddingHorizontal="32dp"
+        android:paddingBottom="32dp">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="40dp"
+            android:layout_marginBottom="12dp"
             android:text="@string/ringing_volume_hint"
             android:textColor="#CCCCCC"
             android:textSize="14sp" />
@@ -56,11 +78,11 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnStop"
             android:layout_width="match_parent"
-            android:layout_height="64dp"
-            android:layout_marginTop="48dp"
+            android:layout_height="60dp"
             android:text="@string/notif_stop_action"
             android:textSize="18sp"
             app:backgroundTint="#D32F2F" />
 
     </LinearLayout>
+
 </FrameLayout>
