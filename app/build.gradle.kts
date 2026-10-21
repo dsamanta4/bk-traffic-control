@@ -5,14 +5,18 @@ plugins {
 
 android {
     namespace = "org.brahmakumaris.trafficcontrol"
-    compileSdk = 33
+    // compileSdk 34 only to access Android 14's full-screen-intent APIs at
+    // compile time (NotificationManager.canUseFullScreenIntent(),
+    // Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT); targetSdk stays 33
+    // so the app doesn't opt into any other Android 14 behavior changes.
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "org.brahmakumaris.trafficcontrol"
         minSdk = 24
         targetSdk = 33
-        versionCode = 2
-        versionName = "1.1"
+        versionCode = 3
+        versionName = "1.2"
     }
 
     buildTypes {

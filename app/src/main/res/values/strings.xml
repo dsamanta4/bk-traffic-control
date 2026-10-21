@@ -21,6 +21,7 @@
     <string name="log_subtitle">What actually fired, and what didn\'t.</string>
     <string name="log_empty">Nothing logged yet.</string>
     <string name="log_outcome_fired">FIRED</string>
+    <string name="log_outcome_caught_up">LATE</string>
     <string name="log_outcome_missed">MISSED</string>
     <string name="log_outcome_error">ERROR</string>
     <string name="preview_play_desc">Preview this track</string>
@@ -43,11 +44,16 @@
     <string name="step_exact_alarm_action">Allow exact alarms</string>
     <string name="step_exact_alarm_done">Allowed</string>
 
-    <string name="step_autostart_title">4. Allow auto-start / background activity</string>
+    <string name="step_full_screen_title">4. Allow full-screen alerts</string>
+    <string name="step_full_screen_desc">Android 14 and newer block apps from popping the ringing screen (with the Stop button and volume control) over the lock screen unless this is granted separately. Without it, the song still plays, but you won\'t see the Stop screen or be able to adjust volume with the hardware buttons until you unlock the phone yourself.</string>
+    <string name="step_full_screen_action">Allow full-screen alerts</string>
+    <string name="step_full_screen_done">Allowed</string>
+
+    <string name="step_autostart_title">5. Allow auto-start / background activity</string>
     <string name="step_autostart_desc">Most phone brands (Xiaomi, Samsung, Vivo, Oppo, Motorola, OnePlus…) have an EXTRA battery manager of their own, on top of Android\'s. Open it and allow Traffic Control to auto-start and run in the background.</string>
     <string name="step_autostart_action">Open %1$s settings</string>
 
-    <string name="step_test_title">5. Test it right now</string>
+    <string name="step_test_title">6. Test it right now</string>
     <string name="step_test_desc">Fires a test alarm one minute from now, using the real alarm path end-to-end, so you know immediately if setup worked — no need to wait until 3:30 AM.</string>
     <string name="step_test_action">Send test alarm in 1 minute</string>
     <string name="step_test_scheduled">Test alarm scheduled for %1$s</string>
@@ -57,11 +63,14 @@
     <string name="health_check_title">Traffic Control needs a quick fix</string>
     <string name="health_check_battery">Battery saving got turned back on for this app — tap to fix</string>
     <string name="health_check_exact_alarm">Exact alarm permission was turned off — tap to fix</string>
+    <string name="health_check_full_screen">Full-screen alert permission was turned off — tap to fix</string>
 
     <string name="notif_channel_service_name">Traffic Control status</string>
     <string name="notif_channel_playback_name">Scheduled reminder playing</string>
     <string name="notif_playing_title">Traffic Control</string>
     <string name="notif_playing_text">Playing: %1$s</string>
+    <string name="notif_playing_text_late">Playing late (missed its exact time): %1$s</string>
     <string name="notif_stop_action">Stop</string>
+    <string name="ringing_volume_hint">Use the volume buttons to adjust</string>
     <string name="notif_test_text">Test reminder</string>
 </resources>

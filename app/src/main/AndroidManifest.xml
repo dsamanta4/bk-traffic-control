@@ -25,6 +25,17 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- Only for the GitHub-releases update check; nothing else in this app touches the network. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!--
+      Lets the playback notification pop AlarmRingingActivity over the lock
+      screen for a real alarm - the only way to make hardware volume buttons
+      adjust the alarm stream (see AlarmRingingActivity.kt). This is a normal,
+      install-time-granted permission for a targetSdk 33 app, but confirmed by
+      real-device testing that Android 14 (API 34) silently rejects it anyway
+      (NotificationManager.canUseFullScreenIntent() returns false) until the
+      user separately grants it via Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT -
+      SetupActivity's step 4 and HealthCheck both cover that on API 34+.
+    -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
 
     <application
@@ -57,6 +68,13 @@
             android:name=".playback.PlaybackService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+
+        <activity
+            android:name=".playback.AlarmRingingActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:theme="@style/Theme.TrafficControl" />
 
         <receiver
             android:name=".alarm.AlarmReceiver"

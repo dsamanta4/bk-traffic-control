@@ -42,6 +42,10 @@ class SetupActivity : AppCompatActivity() {
         binding.btnNotifications.setOnClickListener { requestNotificationPermission() }
         binding.btnBattery.setOnClickListener { requestIgnoreBatteryOptimizations() }
         binding.btnExactAlarm.setOnClickListener { requestExactAlarmPermission() }
+        binding.fullScreenStep.visibility =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) android.view.View.VISIBLE
+            else android.view.View.GONE
+        binding.btnFullScreen.setOnClickListener { requestFullScreenIntentPermission() }
         binding.btnAutostart.text =
             getString(R.string.step_autostart_action, OemSettings.manufacturerLabel())
         binding.btnAutostart.setOnClickListener { OemSettings.openManufacturerSettings(this) }
@@ -78,6 +82,32 @@ class SetupActivity : AppCompatActivity() {
         binding.btnExactAlarm.isEnabled = !canScheduleExactAlarms()
         binding.btnExactAlarm.text = if (canScheduleExactAlarms())
             getString(R.string.step_exact_alarm_done) else getString(R.string.step_exact_alarm_action)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            binding.btnFullScreen.isEnabled = !canUseFullScreenIntent()
+            binding.btnFullScreen.text = if (canUseFullScreenIntent())
+                getString(R.string.step_full_screen_done) else getString(R.string.step_full_screen_action)
+        }
+    }
+
+    private fun canUseFullScreenIntent(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return true
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+        return nm.canUseFullScreenIntent()
+    }
+
+    private fun requestFullScreenIntentPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
+        val intent = Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+            data = Uri.parse("package:$packageName")
+        }
+        try {
+            startActivity(intent)
+        } catch (e: Exception) {
+            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:$packageName")
+            })
+        }
     }
 
     private fun canScheduleExactAlarms(): Boolean {

@@ -85,7 +85,33 @@
             android:layout_marginBottom="24dp"
             android:text="@string/step_exact_alarm_action" />
 
-        <!-- Step 4: OEM autostart -->
+        <!-- Step 4: Full-screen alert permission (Android 14+ only; view visibility is set in code) -->
+        <LinearLayout
+            android:id="@+id/fullScreenStep"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/step_full_screen_title"
+                android:textStyle="bold"
+                android:textSize="16sp" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="8dp"
+                android:text="@string/step_full_screen_desc" />
+            <Button
+                android:id="@+id/btnFullScreen"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                android:text="@string/step_full_screen_action" />
+        </LinearLayout>
+
+        <!-- Step 5: OEM autostart -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -104,7 +130,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="24dp" />
 
-        <!-- Step 4: Test -->
+        <!-- Step 6: Test -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

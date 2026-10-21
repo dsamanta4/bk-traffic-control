@@ -2,10 +2,15 @@ package org.brahmakumaris.trafficcontrol.playback
 
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.MediaPlayer
+import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
@@ -28,9 +33,37 @@ class PlaybackService : Service() {
 
     private var mediaPlayer: MediaPlayer? = null
     private var wakeLock: PowerManager.WakeLock? = null
+    private var audioFocusRequest: AudioFocusRequest? = null
     private var currentSlotId: Int? = null
     private var currentLabel: String = ""
     private var currentIsRealAlarm: Boolean = false
+    private var currentIsCatchUp: Boolean = false
+
+    /**
+     * Fixes the other half of the volume complaint: previously, moving the
+     * in-app slider while a track was already playing only took effect on
+     * the *next* track - this app had no way to reach a MediaPlayer it was
+     * already running. Listening for the slider's broadcast while playing
+     * and re-applying setVolume() immediately closes that gap.
+     */
+    private val volumeChangeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val percent = intent.getIntExtra(EXTRA_VOLUME_PERCENT, -1)
+            if (percent < 0) return
+            val v = percent.coerceIn(0, 100) / 100f
+            mediaPlayer?.setVolume(v, v)
+        }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        val filter = IntentFilter(ACTION_VOLUME_CHANGED)
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(volumeChangeReceiver, filter, RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(volumeChangeReceiver, filter)
+        }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -43,13 +76,15 @@ class PlaybackService : Service() {
         val slotId = intent?.getIntExtra(EXTRA_SLOT_ID, Int.MIN_VALUE) ?: Int.MIN_VALUE
         val label = intent?.getStringExtra(EXTRA_LABEL) ?: getString(R.string.notif_test_text)
         val isRealAlarm = intent?.getBooleanExtra(EXTRA_IS_REAL_ALARM, false) ?: false
+        val isCatchUp = intent?.getBooleanExtra(EXTRA_IS_CATCH_UP, false) ?: false
         currentSlotId = slotId
         currentLabel = label
         currentIsRealAlarm = isRealAlarm
+        currentIsCatchUp = isCatchUp
 
         if (isRealAlarm) raiseSystemAlarmVolume()
 
-        startForeground(NOTIFICATION_ID, buildNotification(label))
+        startForeground(NOTIFICATION_ID, buildNotification(slotId, label, isCatchUp, isRealAlarm))
 
         wakeLock = (getSystemService(POWER_SERVICE) as PowerManager)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TrafficControl:Playback")
@@ -74,14 +109,15 @@ class PlaybackService : Service() {
     private fun playTrack(rawResId: Int) {
         try {
             mediaPlayer?.release()
+            val attributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .build()
+            requestAudioFocus(attributes)
+
             val volume = SchedulePrefs(this).volumePercent.coerceIn(0, 100) / 100f
             mediaPlayer = MediaPlayer().apply {
-                setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .build()
-                )
+                setAudioAttributes(attributes)
                 setVolume(volume, volume)
                 val afd = resources.openRawResourceFd(rawResId)
                 setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
@@ -93,7 +129,8 @@ class PlaybackService : Service() {
             }
             broadcastState(playing = true)
             if (currentIsRealAlarm) {
-                AlarmLog(this).record(currentSlotId ?: return, currentLabel, AlarmOutcome.FIRED)
+                val outcome = if (currentIsCatchUp) AlarmOutcome.CAUGHT_UP else AlarmOutcome.FIRED
+                AlarmLog(this).record(currentSlotId ?: return, currentLabel, outcome)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Playback failed", e)
@@ -104,12 +141,48 @@ class PlaybackService : Service() {
         }
     }
 
+    /**
+     * Fixes a real-world report: pressing the volume rocker while a track
+     * played did nothing. Android routes hardware volume keys to whichever
+     * audio stream currently holds focus - without explicitly requesting
+     * focus for STREAM_ALARM, a background service's playback isn't
+     * guaranteed to be "the" stream the volume keys adjust, even though it's
+     * audibly the only thing playing. Requesting focus is also just correct
+     * practice for anything that plays audio, focus-ducking conflicts with
+     * other apps aside.
+     */
+    private fun requestAudioFocus(attributes: AudioAttributes) {
+        val am = getSystemService(AUDIO_SERVICE) as AudioManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                .setAudioAttributes(attributes)
+                .build()
+            audioFocusRequest = request
+            am.requestAudioFocus(request)
+        } else {
+            @Suppress("DEPRECATION")
+            am.requestAudioFocus(null, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+        }
+    }
+
+    private fun abandonAudioFocus() {
+        val am = getSystemService(AUDIO_SERVICE) as AudioManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let { am.abandonAudioFocusRequest(it) }
+        } else {
+            @Suppress("DEPRECATION")
+            am.abandonAudioFocus(null)
+        }
+        audioFocusRequest = null
+    }
+
     private fun stopSelfSafely() {
         try {
             mediaPlayer?.release()
         } catch (_: Exception) {
         }
         mediaPlayer = null
+        abandonAudioFocus()
         if (wakeLock?.isHeld == true) wakeLock?.release()
         broadcastState(playing = false)
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -157,22 +230,45 @@ class PlaybackService : Service() {
      * stopPendingIntent only ever sends ACTION_STOP to this already-running
      * service, so it works without needing the device unlocked.
      */
-    private fun buildNotification(label: String): android.app.Notification {
+    private fun buildNotification(slotId: Int, label: String, isCatchUp: Boolean, isRealAlarm: Boolean): android.app.Notification {
         val stopIntent = Intent(this, PlaybackService::class.java).setAction(ACTION_STOP)
         val stopPendingIntent = PendingIntent.getService(
             this, 0, stopIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        return NotificationCompat.Builder(this, TrafficControlApp.CHANNEL_PLAYBACK)
+        val text = if (isCatchUp) {
+            getString(R.string.notif_playing_text_late, label)
+        } else {
+            getString(R.string.notif_playing_text, label)
+        }
+        val builder = NotificationCompat.Builder(this, TrafficControlApp.CHANNEL_PLAYBACK)
             .setContentTitle(getString(R.string.notif_playing_title))
-            .setContentText(getString(R.string.notif_playing_text, label))
+            .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_lock_silent_mode_off)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .addAction(android.R.drawable.ic_media_pause, getString(R.string.notif_stop_action), stopPendingIntent)
-            .build()
+
+        // Real alarms only, never manual preview - this is what actually puts
+        // AlarmRingingActivity on screen (over the lock screen if needed),
+        // which is the only way to make hardware volume buttons work (see
+        // that class). The system falls back to just showing this as a
+        // normal heads-up notification if the phone is actively in use.
+        if (isRealAlarm) {
+            val ringingIntent = Intent(this, AlarmRingingActivity::class.java)
+                .putExtra(EXTRA_SLOT_ID, slotId)
+                .putExtra(EXTRA_LABEL, label)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val ringingPendingIntent = PendingIntent.getActivity(
+                this, 1, ringingIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.setFullScreenIntent(ringingPendingIntent, true)
+        }
+
+        return builder.build()
     }
 
     override fun onDestroy() {
@@ -181,7 +277,12 @@ class PlaybackService : Service() {
             mediaPlayer?.release()
         } catch (_: Exception) {
         }
+        abandonAudioFocus()
         if (wakeLock?.isHeld == true) wakeLock?.release()
+        try {
+            unregisterReceiver(volumeChangeReceiver)
+        } catch (_: Exception) {
+        }
     }
 
     companion object {
@@ -191,7 +292,10 @@ class PlaybackService : Service() {
         const val EXTRA_LABEL = "extra_label"
         const val EXTRA_PLAYING = "extra_playing"
         const val EXTRA_IS_REAL_ALARM = "extra_is_real_alarm"
+        const val EXTRA_IS_CATCH_UP = "extra_is_catch_up"
+        const val EXTRA_VOLUME_PERCENT = "extra_volume_percent"
         const val ACTION_STOP = "org.brahmakumaris.trafficcontrol.ACTION_STOP"
         const val ACTION_PLAYBACK_STATE = "org.brahmakumaris.trafficcontrol.ACTION_PLAYBACK_STATE"
+        const val ACTION_VOLUME_CHANGED = "org.brahmakumaris.trafficcontrol.ACTION_VOLUME_CHANGED"
     }
 }

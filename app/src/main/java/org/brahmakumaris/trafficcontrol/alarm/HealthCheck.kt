@@ -75,6 +75,13 @@ object HealthCheck {
             }
         }
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            if (!nm.canUseFullScreenIntent()) {
+                return context.getString(R.string.health_check_full_screen)
+            }
+        }
+
         return null
     }
 

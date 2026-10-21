@@ -1,6 +1,8 @@
 package org.brahmakumaris.trafficcontrol.alarm
 
 import android.content.Context
+import android.content.Intent
+import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
@@ -9,6 +11,7 @@ import androidx.work.WorkerParameters
 import org.brahmakumaris.trafficcontrol.data.AlarmLog
 import org.brahmakumaris.trafficcontrol.data.Schedule
 import org.brahmakumaris.trafficcontrol.data.SchedulePrefs
+import org.brahmakumaris.trafficcontrol.playback.PlaybackService
 import java.util.concurrent.TimeUnit
 
 /**
@@ -35,7 +38,20 @@ class AlarmRefreshWorker(context: Context, params: WorkerParameters) : Coroutine
             }
         }
 
-        AlarmLog(applicationContext).detectAndLogMissed()
+        // Any slot found here is caught within ~30 minutes of when it should
+        // have fired - approved as the right trade-off for a devotional
+        // reminder: late is far better than silently skipped for a whole
+        // day. Anything older than that, checkForUncovered() has already
+        // logged as a plain MISSED instead of handing it back here.
+        for (uncovered in AlarmLog(applicationContext).checkForUncovered()) {
+            val intent = Intent(applicationContext, PlaybackService::class.java)
+                .putExtra(PlaybackService.EXTRA_SLOT_ID, uncovered.slot.id)
+                .putExtra(PlaybackService.EXTRA_LABEL, uncovered.slot.label)
+                .putExtra(PlaybackService.EXTRA_IS_REAL_ALARM, true)
+                .putExtra(PlaybackService.EXTRA_IS_CATCH_UP, true)
+            ContextCompat.startForegroundService(applicationContext, intent)
+        }
+
         HealthCheck.runAndNotify(applicationContext)
 
         return Result.success()

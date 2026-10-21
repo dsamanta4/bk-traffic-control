@@ -139,7 +139,16 @@ class MainActivity : AppCompatActivity() {
         binding.volumeSeekBar.progress = prefs.volumePercent
         binding.volumeSeekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser) prefs.volumePercent = progress
+                if (!fromUser) return
+                prefs.volumePercent = progress
+                // Applies live to whatever's playing right now (real alarm or
+                // preview), not just the next track - PlaybackService only
+                // acts on this while it's actually running something.
+                sendBroadcast(
+                    Intent(PlaybackService.ACTION_VOLUME_CHANGED)
+                        .setPackage(packageName)
+                        .putExtra(PlaybackService.EXTRA_VOLUME_PERCENT, progress)
+                )
             }
 
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}

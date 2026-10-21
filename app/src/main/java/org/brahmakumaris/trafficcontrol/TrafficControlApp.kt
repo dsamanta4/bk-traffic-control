@@ -15,7 +15,13 @@ class TrafficControlApp : Application() {
         // Make sure every enabled slot has a pending alarm as soon as the
         // process is alive for any reason (launcher, boot, or OS-triggered).
         AlarmScheduler(this).rescheduleAll()
-        AlarmLog(this).detectAndLogMissed()
+        // Catch-up playback for a recently-missed slot is only triggered from
+        // AlarmRefreshWorker (runs in a WorkManager-sanctioned background-start
+        // context) - not here, since Application.onCreate() can run in contexts
+        // (e.g. the worker itself waking the process) that aren't a safe place
+        // to start an unrelated foreground service. This call just logs any
+        // genuinely old misses; the worker picks up recent ones within 15 min.
+        AlarmLog(this).checkForUncovered()
     }
 
     private fun createNotificationChannels() {

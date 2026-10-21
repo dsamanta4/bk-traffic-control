@@ -57,12 +57,14 @@ class LogActivity : AppCompatActivity() {
 
     private fun colorFor(outcome: AlarmOutcome): Int = when (outcome) {
         AlarmOutcome.FIRED -> Color.parseColor("#2E7D32")
+        AlarmOutcome.CAUGHT_UP -> Color.parseColor("#F9A825")
         AlarmOutcome.MISSED -> Color.parseColor("#C62828")
         AlarmOutcome.ERROR -> Color.parseColor("#E65100")
     }
 
     private fun textFor(outcome: AlarmOutcome): String = when (outcome) {
         AlarmOutcome.FIRED -> getString(R.string.log_outcome_fired)
+        AlarmOutcome.CAUGHT_UP -> getString(R.string.log_outcome_caught_up)
         AlarmOutcome.MISSED -> getString(R.string.log_outcome_missed)
         AlarmOutcome.ERROR -> getString(R.string.log_outcome_error)
     }

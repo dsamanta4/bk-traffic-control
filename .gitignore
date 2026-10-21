@@ -9,3 +9,7 @@ captures/
 .cxx/
 *.apk
 !reference/original-app/*.apk
+
+# Source wallpaper folder the devotional ringing-screen images were picked
+# from - the 4 actually used are already copied into app/src/main/res/drawable/
+Wallpaper/
