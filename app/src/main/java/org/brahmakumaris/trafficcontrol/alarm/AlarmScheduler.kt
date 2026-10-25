@@ -107,24 +107,32 @@ class AlarmScheduler(private val context: Context) {
         )
     }
 
-    private fun nextOccurrence(hour: Int, minute: Int): Long {
-        val now = Calendar.getInstance()
-        val target = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, hour)
-            set(Calendar.MINUTE, minute)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        if (!target.after(now)) {
-            target.add(Calendar.DAY_OF_YEAR, 1)
-        }
-        return target.timeInMillis
-    }
+    private fun nextOccurrence(hour: Int, minute: Int): Long = nextOccurrence(hour, minute, Calendar.getInstance())
 
     companion object {
         private const val TAG = "AlarmScheduler"
         const val ACTION_FIRE = "org.brahmakumaris.trafficcontrol.ACTION_FIRE"
         const val EXTRA_SLOT_ID = "extra_slot_id"
         const val TEST_SLOT_ID = -1
+
+        /**
+         * Pure date math, deliberately separated from the instance so it can
+         * be driven with a synthetic `now` in a unit test - the only way to
+         * cheaply verify "does this still compute the right next occurrence"
+         * across month/year boundaries and leap years without waiting for
+         * real calendar time to pass.
+         */
+        internal fun nextOccurrence(hour: Int, minute: Int, now: Calendar): Long {
+            val target = (now.clone() as Calendar).apply {
+                set(Calendar.HOUR_OF_DAY, hour)
+                set(Calendar.MINUTE, minute)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            if (!target.after(now)) {
+                target.add(Calendar.DAY_OF_YEAR, 1)
+            }
+            return target.timeInMillis
+        }
     }
 }

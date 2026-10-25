@@ -124,12 +124,23 @@ class AlarmRingingActivity : AppCompatActivity() {
     companion object {
         // Bundled Brahma Kumaris artwork - one is picked at random each time
         // this screen appears, so it varies alarm to alarm rather than
-        // always showing the same image.
-        private val BACKGROUNDS = listOf(
+        // always showing the same image. internal (not private) so a unit
+        // test can verify the shuffle actually covers every entry.
+        internal val BACKGROUNDS = listOf(
             R.drawable.ringing_bg_1,
             R.drawable.ringing_bg_2,
             R.drawable.ringing_bg_3,
-            R.drawable.ringing_bg_4
+            R.drawable.ringing_bg_4,
+            R.drawable.ringing_bg_5,
+            R.drawable.ringing_bg_6,
+            R.drawable.ringing_bg_7,
+            R.drawable.ringing_bg_8,
+            R.drawable.ringing_bg_9,
+            R.drawable.ringing_bg_10,
+            R.drawable.ringing_bg_11,
+            R.drawable.ringing_bg_12,
+            R.drawable.ringing_bg_13,
+            R.drawable.ringing_bg_14
         )
     }
 

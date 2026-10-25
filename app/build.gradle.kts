@@ -15,8 +15,9 @@ android {
         applicationId = "org.brahmakumaris.trafficcontrol"
         minSdk = 24
         targetSdk = 33
-        versionCode = 5
-        versionName = "1.3"
+        versionCode = 6
+        versionName = "1.4"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -45,4 +46,14 @@ dependencies {
     implementation("com.google.android.material:material:1.9.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.work:work-runtime-ktx:2.8.1")
+
+    // Pure-JVM unit tests (app/src/test) - no device/emulator needed.
+    testImplementation("junit:junit:4.13.2")
+
+    // On-device instrumented tests (app/src/androidTest) - these exercise
+    // the real SharedPreferences-backed classes, which a plain JVM test
+    // can't without pulling in Robolectric (avoided here to keep the
+    // already version-pinned build toolchain as simple as possible).
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test:runner:1.5.2")
 }

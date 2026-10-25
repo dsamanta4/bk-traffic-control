@@ -97,18 +97,31 @@ class AlarmLog(context: Context) {
         return uncovered
     }
 
-    private fun mostRecentPastOccurrence(hour: Int, minute: Int): Long {
-        val now = Calendar.getInstance()
-        val candidate = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, hour)
-            set(Calendar.MINUTE, minute)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
+    private fun mostRecentPastOccurrence(hour: Int, minute: Int): Long =
+        mostRecentPastOccurrence(hour, minute, Calendar.getInstance())
+
+    companion object {
+        private const val KEY_ENTRIES = "entries"
+        private const val MAX_ENTRIES = 100
+        private const val TOLERANCE_MILLIS = 10 * 60 * 1000L
+        private const val GRACE_PERIOD_MILLIS = 3 * 60 * 1000L
+        private const val CATCHUP_WINDOW_MILLIS = 30 * 60 * 1000L
+
+        /** Same reasoning as AlarmScheduler's twin of this function: pure
+         * date math, separated out so a unit test can drive it with a
+         * synthetic `now` across many simulated days/months/years. */
+        internal fun mostRecentPastOccurrence(hour: Int, minute: Int, now: Calendar): Long {
+            val candidate = (now.clone() as Calendar).apply {
+                set(Calendar.HOUR_OF_DAY, hour)
+                set(Calendar.MINUTE, minute)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+            if (candidate.after(now)) {
+                candidate.add(Calendar.DAY_OF_YEAR, -1)
+            }
+            return candidate.timeInMillis
         }
-        if (candidate.after(now)) {
-            candidate.add(Calendar.DAY_OF_YEAR, -1)
-        }
-        return candidate.timeInMillis
     }
 
     private fun readAll(): List<AlarmLogEntry> {
@@ -145,13 +158,5 @@ class AlarmLog(context: Context) {
             )
         }
         prefs.edit().putString(KEY_ENTRIES, array.toString()).apply()
-    }
-
-    companion object {
-        private const val KEY_ENTRIES = "entries"
-        private const val MAX_ENTRIES = 100
-        private const val TOLERANCE_MILLIS = 10 * 60 * 1000L
-        private const val GRACE_PERIOD_MILLIS = 3 * 60 * 1000L
-        private const val CATCHUP_WINDOW_MILLIS = 30 * 60 * 1000L
     }
 }
