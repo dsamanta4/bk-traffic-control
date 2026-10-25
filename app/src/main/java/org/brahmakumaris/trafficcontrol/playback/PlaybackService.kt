@@ -2,10 +2,7 @@ package org.brahmakumaris.trafficcontrol.playback
 
 import android.app.PendingIntent
 import android.app.Service
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -22,6 +19,7 @@ import org.brahmakumaris.trafficcontrol.data.AlarmLog
 import org.brahmakumaris.trafficcontrol.data.AlarmOutcome
 import org.brahmakumaris.trafficcontrol.data.Schedule
 import org.brahmakumaris.trafficcontrol.data.SchedulePrefs
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Foreground service that plays one scheduled track to completion, then
@@ -39,30 +37,30 @@ class PlaybackService : Service() {
     private var currentIsRealAlarm: Boolean = false
     private var currentIsCatchUp: Boolean = false
 
+    override fun onCreate() {
+        super.onCreate()
+        instance = this
+    }
+
     /**
      * Fixes the other half of the volume complaint: previously, moving the
      * in-app slider while a track was already playing only took effect on
      * the *next* track - this app had no way to reach a MediaPlayer it was
-     * already running. Listening for the slider's broadcast while playing
-     * and re-applying setVolume() immediately closes that gap.
+     * already running. Called directly from MainActivity via the companion
+     * instance reference while playing, so it closes that gap immediately.
+     *
+     * This used to be a dynamically-registered BroadcastReceiver for
+     * ACTION_VOLUME_CHANGED. A security review found that on API < 33 a
+     * dynamically-registered receiver has no way to be marked unexported -
+     * any other app on the device could send that broadcast and silently
+     * change this app's live playback volume. Since this signal only ever
+     * needs to travel between this app's own components, a direct in-process
+     * call removes that exposure entirely instead of only patching it on
+     * newer Android versions.
      */
-    private val volumeChangeReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            val percent = intent.getIntExtra(EXTRA_VOLUME_PERCENT, -1)
-            if (percent < 0) return
-            val v = percent.coerceIn(0, 100) / 100f
-            mediaPlayer?.setVolume(v, v)
-        }
-    }
-
-    override fun onCreate() {
-        super.onCreate()
-        val filter = IntentFilter(ACTION_VOLUME_CHANGED)
-        if (Build.VERSION.SDK_INT >= 33) {
-            registerReceiver(volumeChangeReceiver, filter, RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(volumeChangeReceiver, filter)
-        }
+    private fun applyVolumeNow(percent: Int) {
+        val v = percent.coerceIn(0, 100) / 100f
+        mediaPlayer?.setVolume(v, v)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -128,7 +126,7 @@ class PlaybackService : Service() {
                 start()
             }
             isPlaying = true
-            broadcastState(playing = true)
+            notifyState(playing = true)
             if (currentIsRealAlarm) {
                 val outcome = if (currentIsCatchUp) AlarmOutcome.CAUGHT_UP else AlarmOutcome.FIRED
                 AlarmLog(this).record(currentSlotId ?: return, currentLabel, outcome)
@@ -186,7 +184,7 @@ class PlaybackService : Service() {
         abandonAudioFocus()
         if (wakeLock?.isHeld == true) wakeLock?.release()
         isPlaying = false
-        broadcastState(playing = false)
+        notifyState(playing = false)
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -212,15 +210,13 @@ class PlaybackService : Service() {
         }
     }
 
-    /** Lets MainActivity's preview buttons reflect what's actually playing. */
-    private fun broadcastState(playing: Boolean) {
+    /** Lets MainActivity's preview buttons and AlarmRingingActivity's
+     * auto-close logic react to what's actually playing. */
+    private fun notifyState(playing: Boolean) {
         val slotId = currentSlotId ?: return
-        sendBroadcast(
-            Intent(ACTION_PLAYBACK_STATE)
-                .setPackage(packageName)
-                .putExtra(EXTRA_SLOT_ID, slotId)
-                .putExtra(EXTRA_PLAYING, playing)
-        )
+        for (listener in stateListeners) {
+            listener(slotId, playing)
+        }
     }
 
     /**
@@ -293,10 +289,7 @@ class PlaybackService : Service() {
         abandonAudioFocus()
         if (wakeLock?.isHeld == true) wakeLock?.release()
         isPlaying = false
-        try {
-            unregisterReceiver(volumeChangeReceiver)
-        } catch (_: Exception) {
-        }
+        if (instance === this) instance = null
     }
 
     companion object {
@@ -305,26 +298,57 @@ class PlaybackService : Service() {
 
         /**
          * Ground truth for AlarmRingingActivity to check directly, not just
-         * react to broadcastState()'s one-shot signal. A real-device report
+         * react to notifyState()'s one-shot signal. A real-device report
          * showed the ringing screen stuck on-screen over an hour after its
-         * song had finished: the screen had been paused (receiver
-         * unregistered) when the "stopped" broadcast fired, which is
-         * fire-and-forget and is never redelivered to a receiver that
+         * song had finished: the screen had been paused (listener not yet
+         * registered again) when the "stopped" signal fired, which is
+         * fire-and-forget and is never redelivered to a listener that
          * registers later. This flag lets the Activity ask "is anything
          * actually still playing?" whenever it becomes visible again, instead
-         * of only ever finding out through a broadcast it might have missed.
+         * of only ever finding out through a signal it might have missed.
          */
         @Volatile
         var isPlaying: Boolean = false
 
+        /**
+         * The one running instance, if any - this service never runs more
+         * than one at a time (a new track always replaces the old one), so
+         * a plain nullable reference is enough to let MainActivity apply a
+         * live volume change without going through a system-wide broadcast.
+         */
+        @Volatile
+        private var instance: PlaybackService? = null
+
+        /**
+         * In-process pub/sub for playback state, replacing what used to be
+         * an ACTION_PLAYBACK_STATE broadcast. A security review found that a
+         * dynamically-registered BroadcastReceiver has no way to be marked
+         * unexported on API < 33 - any other app on the device could send
+         * that broadcast and, for example, force AlarmRingingActivity to
+         * close early while the alarm kept playing. This signal only ever
+         * needs to reach this app's own components, so an in-process
+         * listener list removes that exposure on every Android version
+         * instead of only patching newer ones.
+         */
+        private val stateListeners = CopyOnWriteArrayList<(slotId: Int, playing: Boolean) -> Unit>()
+
+        fun addStateListener(listener: (slotId: Int, playing: Boolean) -> Unit) {
+            stateListeners.add(listener)
+        }
+
+        fun removeStateListener(listener: (slotId: Int, playing: Boolean) -> Unit) {
+            stateListeners.remove(listener)
+        }
+
+        /** Applies a live volume change to whatever's currently playing, if anything is. */
+        fun applyLiveVolume(percent: Int) {
+            instance?.applyVolumeNow(percent)
+        }
+
         const val EXTRA_SLOT_ID = "extra_slot_id"
         const val EXTRA_LABEL = "extra_label"
-        const val EXTRA_PLAYING = "extra_playing"
         const val EXTRA_IS_REAL_ALARM = "extra_is_real_alarm"
         const val EXTRA_IS_CATCH_UP = "extra_is_catch_up"
-        const val EXTRA_VOLUME_PERCENT = "extra_volume_percent"
         const val ACTION_STOP = "org.brahmakumaris.trafficcontrol.ACTION_STOP"
-        const val ACTION_PLAYBACK_STATE = "org.brahmakumaris.trafficcontrol.ACTION_PLAYBACK_STATE"
-        const val ACTION_VOLUME_CHANGED = "org.brahmakumaris.trafficcontrol.ACTION_VOLUME_CHANGED"
     }
 }

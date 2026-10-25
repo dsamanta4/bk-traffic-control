@@ -1,9 +1,6 @@
 package org.brahmakumaris.trafficcontrol.playback
 
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
@@ -31,11 +28,11 @@ class AlarmRingingActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityAlarmRingingBinding
 
-    private val stateReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            val playing = intent.getBooleanExtra(PlaybackService.EXTRA_PLAYING, false)
-            if (!playing) finish()
-        }
+    // In-process listener, not a BroadcastReceiver - see PlaybackService's
+    // stateListeners doc for why (a dynamically-registered receiver can't be
+    // marked unexported on API < 33, exposing this signal to other apps).
+    private val stateListener: (Int, Boolean) -> Unit = { _, playing ->
+        if (!playing) finish()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -85,22 +82,17 @@ class AlarmRingingActivity : AppCompatActivity() {
 
     /**
      * Registered here (not onResume/onPause): a normal screen-timeout pauses
-     * this Activity without stopping it, and a receiver registered only
-     * while resumed would be unregistered for that whole window - exactly
+     * this Activity without stopping it, and a listener registered only
+     * while resumed would be removed for that whole window - exactly
      * when a track is most likely to finish naturally, since nobody is
      * interacting with the screen. onStart/onStop keeps it listening across
-     * a screen-off, only unregistering if the Activity is actually gone.
+     * a screen-off, only removing it once the Activity is actually gone.
      */
     override fun onStart() {
         super.onStart()
-        val filter = IntentFilter(PlaybackService.ACTION_PLAYBACK_STATE)
-        if (Build.VERSION.SDK_INT >= 33) {
-            registerReceiver(stateReceiver, filter, RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(stateReceiver, filter)
-        }
-        // Covers the broadcast this receiver could still have missed: it's a
-        // one-shot send, never redelivered, so if playback already stopped
+        PlaybackService.addStateListener(stateListener)
+        // Covers the signal this listener could still have missed: it's a
+        // one-shot call, never redelivered, so if playback already stopped
         // before this registration (or while this Activity didn't exist at
         // all yet), the only way to find out is to ask directly.
         if (!PlaybackService.isPlaying) finish()
@@ -108,7 +100,7 @@ class AlarmRingingActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
-        unregisterReceiver(stateReceiver)
+        PlaybackService.removeStateListener(stateListener)
     }
 
     override fun onResume() {

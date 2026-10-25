@@ -1,9 +1,6 @@
 package org.brahmakumaris.trafficcontrol.ui
 
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -49,19 +46,18 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-    private val playbackStateReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            val slotId = intent.getIntExtra(PlaybackService.EXTRA_SLOT_ID, Int.MIN_VALUE)
-            val playing = intent.getBooleanExtra(PlaybackService.EXTRA_PLAYING, false)
-            if (playing) {
-                // A new slot started: whichever button was showing "stop" before is now stale.
-                previewingSlotId?.let { setButtonPlaying(it, false) }
-                previewingSlotId = slotId
-                setButtonPlaying(slotId, true)
-            } else if (slotId == previewingSlotId) {
-                previewingSlotId = null
-                setButtonPlaying(slotId, false)
-            }
+    // In-process listener, not a BroadcastReceiver - see PlaybackService's
+    // stateListeners doc for why (a dynamically-registered receiver can't be
+    // marked unexported on API < 33, exposing this signal to other apps).
+    private val playbackStateListener: (Int, Boolean) -> Unit = { slotId, playing ->
+        if (playing) {
+            // A new slot started: whichever button was showing "stop" before is now stale.
+            previewingSlotId?.let { setButtonPlaying(it, false) }
+            previewingSlotId = slotId
+            setButtonPlaying(slotId, true)
+        } else if (slotId == previewingSlotId) {
+            previewingSlotId = null
+            setButtonPlaying(slotId, false)
         }
     }
 
@@ -114,17 +110,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        val filter = IntentFilter(PlaybackService.ACTION_PLAYBACK_STATE)
-        if (android.os.Build.VERSION.SDK_INT >= 33) {
-            registerReceiver(playbackStateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(playbackStateReceiver, filter)
-        }
+        PlaybackService.addStateListener(playbackStateListener)
     }
 
     override fun onStop() {
         super.onStop()
-        unregisterReceiver(playbackStateReceiver)
+        PlaybackService.removeStateListener(playbackStateListener)
     }
 
     private fun updateReliabilityStatus() {
@@ -144,11 +135,7 @@ class MainActivity : AppCompatActivity() {
                 // Applies live to whatever's playing right now (real alarm or
                 // preview), not just the next track - PlaybackService only
                 // acts on this while it's actually running something.
-                sendBroadcast(
-                    Intent(PlaybackService.ACTION_VOLUME_CHANGED)
-                        .setPackage(packageName)
-                        .putExtra(PlaybackService.EXTRA_VOLUME_PERCENT, progress)
-                )
+                PlaybackService.applyLiveVolume(progress)
             }
 
             override fun onStartTrackingTouch(seekBar: SeekBar?) {}
