@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.PowerManager
 import androidx.core.content.ContextCompat
 import org.brahmakumaris.trafficcontrol.data.Schedule
+import org.brahmakumaris.trafficcontrol.data.SchedulePrefs
 import org.brahmakumaris.trafficcontrol.playback.PlaybackService
 
 /**
@@ -34,6 +35,21 @@ class AlarmReceiver : BroadcastReceiver() {
             }
 
             val slot = Schedule.byId(slotId) ?: return
+
+            // A real-world report: a disabled slot kept firing again a day
+            // or two after being turned off. AlarmManager.cancel() can lose
+            // a race against an alarm whose broadcast is already in flight
+            // the instant someone disables a slot, so this receiver can
+            // still run once for a slot the user has since turned off. The
+            // old code rescheduled tomorrow's occurrence unconditionally
+            // right here, which turned that one stray firing into an
+            // unstoppable chain - every subsequent firing rearmed the next
+            // one, forever, regardless of the toggle. Checking the current
+            // preference before doing anything else, playback included,
+            // means a disabled slot's chain actually ends instead of
+            // perpetuating itself.
+            if (!SchedulePrefs(context).isSlotEnabled(slot.id)) return
+
             AlarmScheduler(context).scheduleNextOccurrence(slot.id, slot.hour, slot.minute)
             startPlayback(context, slot.id, slot.label)
         } finally {

@@ -15,8 +15,8 @@ android {
         applicationId = "org.brahmakumaris.trafficcontrol"
         minSdk = 24
         targetSdk = 33
-        versionCode = 4
-        versionName = "1.2.1"
+        versionCode = 5
+        versionName = "1.3"
     }
 
     buildTypes {

@@ -127,6 +127,7 @@ class PlaybackService : Service() {
                 prepare()
                 start()
             }
+            isPlaying = true
             broadcastState(playing = true)
             if (currentIsRealAlarm) {
                 val outcome = if (currentIsCatchUp) AlarmOutcome.CAUGHT_UP else AlarmOutcome.FIRED
@@ -184,6 +185,7 @@ class PlaybackService : Service() {
         mediaPlayer = null
         abandonAudioFocus()
         if (wakeLock?.isHeld == true) wakeLock?.release()
+        isPlaying = false
         broadcastState(playing = false)
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -254,8 +256,18 @@ class PlaybackService : Service() {
         // Real alarms only, never manual preview - this is what actually puts
         // AlarmRingingActivity on screen (over the lock screen if needed),
         // which is the only way to make hardware volume buttons work (see
-        // that class). The system falls back to just showing this as a
-        // normal heads-up notification if the phone is actively in use.
+        // that class). The system only auto-launches a full-screen intent
+        // when the device is locked or the screen is off; if the phone is
+        // already unlocked and in active use when the alarm fires, Android
+        // deliberately shows this as an ordinary heads-up notification
+        // instead (confirmed against AOSP behaviour, not a guess) - no app
+        // can override that, and no app should want to, since the same
+        // restriction is what stops a malicious app from hijacking the
+        // screen at will. setContentIntent makes sure that in that case
+        // there is still a one-tap way to reach the volume-capable screen:
+        // without it, tapping the notification did nothing at all, and the
+        // only route back to hardware volume control was gone until the
+        // song finished on its own.
         if (isRealAlarm) {
             val ringingIntent = Intent(this, AlarmRingingActivity::class.java)
                 .putExtra(EXTRA_SLOT_ID, slotId)
@@ -266,6 +278,7 @@ class PlaybackService : Service() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             builder.setFullScreenIntent(ringingPendingIntent, true)
+            builder.setContentIntent(ringingPendingIntent)
         }
 
         return builder.build()
@@ -279,6 +292,7 @@ class PlaybackService : Service() {
         }
         abandonAudioFocus()
         if (wakeLock?.isHeld == true) wakeLock?.release()
+        isPlaying = false
         try {
             unregisterReceiver(volumeChangeReceiver)
         } catch (_: Exception) {
@@ -288,6 +302,21 @@ class PlaybackService : Service() {
     companion object {
         private const val TAG = "PlaybackService"
         private const val NOTIFICATION_ID = 42
+
+        /**
+         * Ground truth for AlarmRingingActivity to check directly, not just
+         * react to broadcastState()'s one-shot signal. A real-device report
+         * showed the ringing screen stuck on-screen over an hour after its
+         * song had finished: the screen had been paused (receiver
+         * unregistered) when the "stopped" broadcast fired, which is
+         * fire-and-forget and is never redelivered to a receiver that
+         * registers later. This flag lets the Activity ask "is anything
+         * actually still playing?" whenever it becomes visible again, instead
+         * of only ever finding out through a broadcast it might have missed.
+         */
+        @Volatile
+        var isPlaying: Boolean = false
+
         const val EXTRA_SLOT_ID = "extra_slot_id"
         const val EXTRA_LABEL = "extra_label"
         const val EXTRA_PLAYING = "extra_playing"

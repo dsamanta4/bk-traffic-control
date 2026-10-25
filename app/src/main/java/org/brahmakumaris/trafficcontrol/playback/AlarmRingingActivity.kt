@@ -44,6 +44,32 @@ class AlarmRingingActivity : AppCompatActivity() {
 
         binding = ActivityAlarmRingingBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        bindToIntent(intent)
+
+        binding.btnStop.setOnClickListener {
+            startService(Intent(this, PlaybackService::class.java).setAction(PlaybackService.ACTION_STOP))
+            finish()
+        }
+    }
+
+    /**
+     * This Activity is launchMode="singleInstance" (needed so the hardware
+     * volume-key binding always targets one well-known screen), which means
+     * a second alarm firing while this one is still showing doesn't create
+     * a new instance - Android redelivers into this one via onNewIntent().
+     * A real-world report caught exactly this: the 7:00 AM alarm fired
+     * while the earlier test alarm's screen was still up, PlaybackService
+     * correctly switched to the new track, but the screen kept showing the
+     * old one's time/label/image indefinitely, because nothing here ever
+     * updated it for the new intent.
+     */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        bindToIntent(intent)
+    }
+
+    private fun bindToIntent(intent: Intent) {
         binding.ringingBackground.setImageResource(BACKGROUNDS.random())
 
         val slotId = intent.getIntExtra(PlaybackService.EXTRA_SLOT_ID, Int.MIN_VALUE)
@@ -55,28 +81,44 @@ class AlarmRingingActivity : AppCompatActivity() {
             ""
         }
         binding.ringingLabel.text = label
-
-        binding.btnStop.setOnClickListener {
-            startService(Intent(this, PlaybackService::class.java).setAction(PlaybackService.ACTION_STOP))
-            finish()
-        }
     }
 
-    override fun onResume() {
-        super.onResume()
-        volumeControlStream = AudioManager.STREAM_ALARM
+    /**
+     * Registered here (not onResume/onPause): a normal screen-timeout pauses
+     * this Activity without stopping it, and a receiver registered only
+     * while resumed would be unregistered for that whole window - exactly
+     * when a track is most likely to finish naturally, since nobody is
+     * interacting with the screen. onStart/onStop keeps it listening across
+     * a screen-off, only unregistering if the Activity is actually gone.
+     */
+    override fun onStart() {
+        super.onStart()
         val filter = IntentFilter(PlaybackService.ACTION_PLAYBACK_STATE)
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(stateReceiver, filter, RECEIVER_NOT_EXPORTED)
         } else {
             registerReceiver(stateReceiver, filter)
         }
+        // Covers the broadcast this receiver could still have missed: it's a
+        // one-shot send, never redelivered, so if playback already stopped
+        // before this registration (or while this Activity didn't exist at
+        // all yet), the only way to find out is to ask directly.
+        if (!PlaybackService.isPlaying) finish()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        unregisterReceiver(stateReceiver)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        volumeControlStream = AudioManager.STREAM_ALARM
     }
 
     override fun onPause() {
         super.onPause()
         volumeControlStream = AudioManager.USE_DEFAULT_STREAM_TYPE
-        unregisterReceiver(stateReceiver)
     }
 
     companion object {
